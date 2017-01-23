@@ -100,10 +100,10 @@ func (p *Packet) computeTCPChecksum() uint16 {
 	// Construct the pseudo-header for TCP checksum computation:
 
 	// bytes 0-3: Source IP address
-	copy(buf[0:4], p.Buffer[ipSourceAddrPos:ipSourceAddrPos+4])
+	copy(buf[0:4], p.Buffer[IPSourceAddrPos:IPSourceAddrPos+4])
 
 	// bytes 4-7: Destination IP address
-	copy(buf[4:8], p.Buffer[ipDestAddrPos:ipDestAddrPos+4])
+	copy(buf[4:8], p.Buffer[IPDestAddrPos:IPDestAddrPos+4])
 
 	// byte 8: Constant zero
 	buf[8] = 0

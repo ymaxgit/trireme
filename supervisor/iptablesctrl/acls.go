@@ -18,14 +18,22 @@ func (i *Instance) chainRules(appChain string, netChain string, ip string) [][]s
 			i.appPacketIPTableContext,
 			i.appPacketIPTableSection,
 			"-s", ip,
+			"-p", "tcp",
 			"-m", "comment", "--comment", "Container specific chain",
 			"-j", appChain,
+		},
+		{
+			i.appPacketIPTableContext,
+			i.appPacketIPTableSection,
+			//"-d", ip,
+			"-p", "udp",
+			"-m", "comment", "--comment", "Container specific chain",
+			"-j", netChain,
 		},
 		{
 			i.appAckPacketIPTableContext,
 			i.appPacketIPTableSection,
 			"-s", ip,
-			"-p", "tcp",
 			"-m", "comment", "--comment", "Container specific chain",
 			"-j", appChain,
 		},
@@ -43,6 +51,11 @@ func (i *Instance) chainRules(appChain string, netChain string, ip string) [][]s
 func (i *Instance) trapRules(appChain string, netChain string, network string, appQueue string, netQueue string) [][]string {
 
 	return [][]string{
+
+		//
+		// TCP rules
+		//
+
 		// Application Syn and Syn/Ack
 		{
 			i.appPacketIPTableContext, appChain,
@@ -66,6 +79,39 @@ func (i *Instance) trapRules(appChain string, netChain string, network string, a
 			"-s", network,
 			"-p", "tcp",
 			"-m", "connbytes", "--connbytes", ":3", "--connbytes-dir", "original", "--connbytes-mode", "packets",
+			"-j", "NFQUEUE", "--queue-balance", netQueue,
+		},
+
+		//
+		// UDP rules
+		//
+
+		// Application side rules
+
+		// Client from application
+		{
+			i.appAckPacketIPTableContext, appChain,
+			"-d", network,
+			"-p", "udp",
+			"-m", "state", "--state", "NEW",
+			"-j", "NFQUEUE", "--queue-balance", appQueue,
+		},
+
+		// Server from client
+		{
+			i.netPacketIPTableContext, netChain,
+			"-s", network,
+			"-p", "udp",
+			"-m", "u32", "--u32", "0&0xFF000000=0x45000000 && 0&0xFFFF=0x28:0xFFFF && 4&0x3FFF=0 && 6&0xFF=17 && 28&0xFFFFFFFF=0xDEADBEEF && 32&0xFFFFFFFF=0xDEADBEEF && 36&0x01000000=0x00000000",
+			"-j", "NFQUEUE", "--queue-balance", netQueue,
+		},
+
+		// Client from server
+		{
+			i.appPacketIPTableContext, netChain,
+			"-s", network,
+			"-p", "udp",
+			"-m", "u32", "--u32", "0&0xFF000000=0x45000000 && 0&0xFFFF=0x28:0xFFFF && 4&0x3FFF=0 && 6&0xFF=17 && 28&0xFFFFFFFF=0xDEADBEEF && 32&0xFFFFFFFF=0xDEADBEEF && 36&0x01000000=0x01000000",
 			"-j", "NFQUEUE", "--queue-balance", netQueue,
 		},
 	}
@@ -114,6 +160,16 @@ func (i *Instance) addContainerChain(appChain string, netChain string) error {
 			"context": i.appPacketIPTableContext,
 			"error":   err.Error(),
 		}).Debug("Failed to create the container specific chain")
+		return err
+	}
+
+	if err := i.ipt.NewChain(i.appPacketIPTableContext, netChain); err != nil {
+		log.WithFields(log.Fields{
+			"package": "iptablesctrl",
+			"chain":   netChain,
+			"context": i.appPacketIPTableContext,
+			"error":   err.Error(),
+		}).Info("Failed to create the container specific chain")
 		return err
 	}
 
@@ -262,6 +318,22 @@ func (i *Instance) addAppACLs(chain string, ip string, rules *policy.IPRuleList)
 		return err
 	}
 
+	// Drop all UDP connections
+	if err := i.ipt.Append(
+		i.appAckPacketIPTableContext, chain,
+		"-d", "0.0.0.0/0",
+		"-p", "udp", "-m", "state", "--state", "NEW",
+		"-j", "DROP"); err != nil {
+
+		log.WithFields(log.Fields{
+			"package": "iptablesctrl",
+			"context": i.netPacketIPTableContext,
+			"chain":   chain,
+			"error":   err.Error(),
+		}).Debug("Error when adding default app acl rule")
+		return err
+	}
+
 	return nil
 }
 
@@ -325,6 +397,22 @@ func (i *Instance) addNetACLs(chain, ip string, rules *policy.IPRuleList) error 
 			"error":   err.Error(),
 		}).Debug("Error when adding default net acl rule")
 
+		return err
+	}
+
+	// Drop all UDP connections
+	if err := i.ipt.Append(
+		i.appAckPacketIPTableContext, chain,
+		"-d", "0.0.0.0/0",
+		"-p", "udp", "-m", "state", "--state", "NEW",
+		"-j", "DROP"); err != nil {
+
+		log.WithFields(log.Fields{
+			"package": "iptablesctrl",
+			"context": i.netPacketIPTableContext,
+			"chain":   chain,
+			"error":   err.Error(),
+		}).Debug("Error when adding default app acl rule")
 		return err
 	}
 

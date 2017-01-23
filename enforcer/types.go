@@ -30,6 +30,23 @@ const (
 	TCPAckProcessed
 )
 
+// UDPFlowState identifies the constants of the state of a UDP Flow
+type UDPFlowState int
+
+const (
+	// UDPSynSend is the state where a syn has been sent
+	UDPSynSend UDPFlowState = iota
+
+	// UDPSynReceived is the state where a syn packet has been received
+	UDPSynReceived
+
+	// UDPAckProcessed is the state that the negotiation has been completed
+	UDPAckProcessed
+
+	// UDPSynAckReceived is the state where a syn ack packet has been received
+	UDPSynAckReceived
+)
+
 const (
 	// DefaultNetwork is the default IP address used when we don't care about IP addresses
 	DefaultNetwork = "0.0.0.0/0"
@@ -51,6 +68,7 @@ type InterfaceStats struct {
 // PacketStats for interface
 type PacketStats struct {
 	IncomingPackets        uint32
+	SkippedPackets         uint32
 	OutgoingPackets        uint32
 	AuthDropPackets        uint32
 	ServicePreDropPackets  uint32

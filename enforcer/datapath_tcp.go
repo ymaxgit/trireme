@@ -2,14 +2,12 @@ package enforcer
 
 // Go libraries
 import (
-	"bytes"
 	"fmt"
 	"strconv"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/aporeto-inc/trireme/collector"
 	"github.com/aporeto-inc/trireme/enforcer/utils/packet"
-	"github.com/aporeto-inc/trireme/enforcer/utils/tokens"
 )
 
 // processNetworkPackets processes packets arriving from network and are destined to the application
@@ -140,24 +138,6 @@ func (d *datapathEnforcer) createTCPAuthenticationOption(token []byte) []byte {
 	}
 
 	return options
-}
-
-func (d *datapathEnforcer) parseAckToken(connection *AuthInfo, data []byte) (*tokens.ConnectionClaims, error) {
-
-	// Validate the certificate and parse the token
-	claims, _ := d.tokenEngine.Decode(true, data, connection.RemotePublicKey)
-	if claims == nil {
-		return nil, fmt.Errorf("Cannot decode the token")
-	}
-
-	// Compare the incoming random context with the stored context
-	matchLocal := bytes.Compare(claims.RMT, connection.LocalContext)
-	matchRemote := bytes.Compare(claims.LCL, connection.RemoteContext)
-	if matchLocal != 0 || matchRemote != 0 {
-		return nil, fmt.Errorf("Failed to match context in ACK packet")
-	}
-
-	return claims, nil
 }
 
 func (d *datapathEnforcer) processApplicationSynPacket(tcpPacket *packet.Packet) (interface{}, error) {

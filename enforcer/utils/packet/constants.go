@@ -28,10 +28,10 @@ const (
 	ipChecksumPos = 10
 
 	// ipSourceAddrPos is location of source IP address
-	ipSourceAddrPos = 12
+	IPSourceAddrPos = 12
 
 	// ipDestAddrPos is location of destination IP address
-	ipDestAddrPos = 16
+	IPDestAddrPos = 16
 )
 
 // IP Protocol numbers
@@ -48,13 +48,33 @@ const (
 	ipHdrLenMask = 0xF
 )
 
+const (
+	// L4SourcePortPos is the position of the source port in the L4 header
+	L4SourcePortPos = 20
+
+	// L4DestPortPos is the position of the source port in the L4 header
+	L4DestPortPos = 22
+)
+
+// UDP Header field position constants
+const (
+	// UDPLengthPos is the location of UDP length
+	UDPLengthPos = 24
+
+	// UDPChecksumPos is the location of UDP checksum
+	UDPChecksumPos = 26
+
+	// UDPDataPos is the location of UDP data
+	UDPDataPos = 28
+)
+
 // TCP Header field position constants
 const (
 	// tcpSourcePortPos is the location of source port
-	tcpSourcePortPos = 20
+	tcpSourcePortPos = L4SourcePortPos
 
 	// tcpDestPortPos is the location of destination port
-	tcpDestPortPos = 22
+	tcpDestPortPos = L4DestPortPos
 
 	// tcpSeqPos is the location of seq
 	tcpSeqPos = 24

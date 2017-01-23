@@ -2,6 +2,7 @@ package enforcer
 
 // Go libraries
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"time"
@@ -37,11 +38,17 @@ type datapathEnforcer struct {
 	// Key=Context Value=Connection. Create on syn packet from application with local context-id
 	contextConnectionTracker cache.DataStore
 
+	// Connection tracker for Applications
+	appUDPConnectionTracker cache.DataStore
+	netUDPConnectionTracker cache.DataStore
+
 	// stats
 	net    *InterfaceStats
 	app    *InterfaceStats
 	netTCP *PacketStats
 	appTCP *PacketStats
+	netUDP *PacketStats
+	appUDP *PacketStats
 
 	// ack size
 	ackSize uint32
@@ -79,6 +86,8 @@ func NewDatapathEnforcer(
 		networkConnectionTracker: cache.NewCacheWithExpiration(time.Second * 60),
 		appConnectionTracker:     cache.NewCacheWithExpiration(time.Second * 60),
 		contextConnectionTracker: cache.NewCacheWithExpiration(time.Second * 60),
+		appUDPConnectionTracker:  cache.NewCacheWithExpiration(time.Second * 60),
+		netUDPConnectionTracker:  cache.NewCacheWithExpiration(time.Second * 60),
 		filterQueue:              filterQueue,
 		mutualAuthorization:      mutualAuth,
 		service:                  service,
@@ -88,6 +97,8 @@ func NewDatapathEnforcer(
 		app:                      &InterfaceStats{},
 		netTCP:                   &PacketStats{},
 		appTCP:                   &PacketStats{},
+		netUDP:                   &PacketStats{},
+		appUDP:                   &PacketStats{},
 		ackSize:                  secrets.AckSize(),
 		remote:                   remote,
 	}
@@ -353,6 +364,8 @@ func (d *datapathEnforcer) processNetworkPacketsFromNFQ(p *netfilter.NFPacket) {
 		netPacket.Print(packet.PacketFailureCreate)
 	} else if netPacket.IPProto == packet.IPProtocolTCP {
 		err = d.processNetworkTCPPackets(netPacket)
+	} else if netPacket.IPProto == packet.IPProtocolUDP {
+		err = d.processNetworkUDPPackets(netPacket)
 	} else {
 		d.net.ProtocolDropPackets++
 		err = fmt.Errorf("Invalid IP Protocol %d", netPacket.IPProto)
@@ -407,6 +420,8 @@ func (d *datapathEnforcer) processApplicationPacketsFromNFQ(p *netfilter.NFPacke
 		appPacket.Print(packet.PacketFailureCreate)
 	} else if appPacket.IPProto == packet.IPProtocolTCP {
 		err = d.processApplicationTCPPackets(appPacket)
+	} else if appPacket.IPProto == packet.IPProtocolUDP {
+		err = d.processApplicationUDPPackets(appPacket)
 	} else {
 		d.app.ProtocolDropPackets++
 		err = fmt.Errorf("Invalid IP Protocol %d", appPacket.IPProto)
@@ -474,6 +489,24 @@ func (d *datapathEnforcer) parsePacketToken(auth *AuthInfo, data []byte) (*token
 	auth.RemotePublicKey = cert
 	auth.RemoteContext = claims.LCL
 	auth.RemoteContextID = remoteContextID
+
+	return claims, nil
+}
+
+func (d *datapathEnforcer) parseAckToken(connection *AuthInfo, data []byte) (*tokens.ConnectionClaims, error) {
+
+	// Validate the certificate and parse the token
+	claims, _ := d.tokenEngine.Decode(true, data, connection.RemotePublicKey)
+	if claims == nil {
+		return nil, fmt.Errorf("Cannot decode the token")
+	}
+
+	// Compare the incoming random context with the stored context
+	matchLocal := bytes.Compare(claims.RMT, connection.LocalContext)
+	matchRemote := bytes.Compare(claims.LCL, connection.RemoteContext)
+	if matchLocal != 0 || matchRemote != 0 {
+		return nil, fmt.Errorf("Failed to match context in ACK packet")
+	}
 
 	return claims, nil
 }
