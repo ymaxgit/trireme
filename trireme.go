@@ -173,9 +173,17 @@ func mustEnforce(contextID string, containerInfo *policy.PUInfo) bool {
 }
 
 func (t *trireme) doHandleCreate(contextID string) error {
-
+	var errStatus error
+	defer func() {
+		if errStatus != nil {
+			//We failed to create the container let us remove the container form our internal
+			//data structures
+			t.cache.Remove(contextID)
+		}
+	}()
 	// Retrieve the container runtime information from the cache
 	cachedElement, err := t.cache.Get(contextID)
+
 	if err != nil {
 		t.collector.CollectContainerEvent(&collector.ContainerRecord{
 			ContextID: contextID,
@@ -184,7 +192,8 @@ func (t *trireme) doHandleCreate(contextID string) error {
 			Event:     collector.ContainerFailed,
 		})
 
-		return fmt.Errorf("Couldn't get the runtimeInfo from the cache %s", err)
+		errStatus = fmt.Errorf("Couldn't get the runtimeInfo from the cache %s", err)
+		return errStatus
 	}
 
 	runtimeInfo := cachedElement.(*policy.PURuntime)
@@ -199,7 +208,8 @@ func (t *trireme) doHandleCreate(contextID string) error {
 			Event:     collector.ContainerFailed,
 		})
 
-		return fmt.Errorf("Policy Error for this context: %s. Container killed. %s", contextID, err)
+		errStatus = fmt.Errorf("Policy Error for this context: %s. Container killed. %s", contextID, err)
+		return errStatus
 	}
 
 	if policyInfo == nil {
@@ -210,7 +220,8 @@ func (t *trireme) doHandleCreate(contextID string) error {
 			Event:     collector.ContainerFailed,
 		})
 
-		return fmt.Errorf("Nil policy returned for context: %s. Container killed", contextID)
+		errStatus = fmt.Errorf("Nil policy returned for context: %s. Container killed", contextID)
+		return errStatus
 	}
 
 	ip, _ := policyInfo.DefaultIPAddress()
@@ -239,7 +250,8 @@ func (t *trireme) doHandleCreate(contextID string) error {
 			Tags:      policyInfo.Annotations(),
 			Event:     collector.ContainerFailed,
 		})
-		return fmt.Errorf("Not able to setup enforcer: %s", err)
+		errStatus = fmt.Errorf("Not able to setup enforcer: %s", err)
+		return errStatus
 	}
 
 	if err := t.supervisors[containerInfo.Runtime.PUType()].Supervise(contextID, containerInfo); err != nil {
@@ -257,7 +269,8 @@ func (t *trireme) doHandleCreate(contextID string) error {
 			Event:     collector.ContainerFailed,
 		})
 
-		return fmt.Errorf("Not able to setup supervisor: %s", err)
+		errStatus = fmt.Errorf("Not able to setup supervisor: %s", err)
+		return errStatus
 	}
 
 	t.collector.CollectContainerEvent(&collector.ContainerRecord{
