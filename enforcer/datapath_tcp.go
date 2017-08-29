@@ -285,7 +285,7 @@ func (d *Datapath) processApplicationSynPacket(tcpPacket *packet.Packet, context
 
 	// We use a trick to reduce the seq number from ISN so that when our component gets out of the way, the
 	// sequence numbers between the TCP stacks automatically match
-	tcpPacket.DecreaseTCPSeq(uint32(len(tcpData)) + (d.ackSize))
+	tcpPacket.DecreaseTCPSeq(uint32(len(tcpData)))
 
 	// Attach the tags to the packet.
 	return nil, tcpPacket.TCPDataAttach(tcpOptions, tcpData)
@@ -339,8 +339,7 @@ func (d *Datapath) processApplicationSynAckPacket(tcpPacket *packet.Packet, cont
 		}
 
 		// Attach the tags to the packet
-		tcpPacket.DecreaseTCPSeq(uint32(len(tcpData)) - 1)
-		tcpPacket.DecreaseTCPAck(d.ackSize)
+		tcpPacket.DecreaseTCPSeq(uint32(len(tcpData)))
 
 		// Attach the tags to the packet
 		return nil, tcpPacket.TCPDataAttach(tcpOptions, tcpData)
@@ -367,27 +366,27 @@ func (d *Datapath) processApplicationAckPacket(tcpPacket *packet.Packet, context
 		// Create a new token that includes the source and destinatio nonse
 		// These are both challenges signed by the secret key and random for every
 		// connection minimizing the chances of a replay attack
-		context.Lock()
-		token, err := d.createAckPacketToken(context, &conn.Auth)
-		context.Unlock()
-		if err != nil {
-			return nil, err
-		}
+		// context.Lock()
+		// token, err := d.createAckPacketToken(context, &conn.Auth)
+		// context.Unlock()
+		// if err != nil {
+		// 	return nil, err
+		// }
 
 		// tcpOptions := d.createTCPAuthenticationOption([]byte{})
 
 		// Since we adjust sequence numbers let's make sure we haven't made a mistake
-		if len(token) != int(d.ackSize) {
-			return nil, fmt.Errorf("Protocol Error %d", len(token))
-		}
+		// if len(token) != int(d.ackSize) {
+		// 	return nil, fmt.Errorf("Protocol Error %d", len(token))
+		// }
 
 		// Attach the tags to the packet
-		tcpPacket.DecreaseTCPSeq(d.ackSize)
+		// tcpPacket.DecreaseTCPSeq(d.ackSize)
 
-		// Attach the tags to the packet
-		if err := tcpPacket.TCPDataAttach([]byte{}, token); err != nil {
-			return nil, err
-		}
+		// // Attach the tags to the packet
+		// if err := tcpPacket.TCPDataAttach([]byte{}, token); err != nil {
+		// 	return nil, err
+		// }
 
 		conn.SetState(TCPAckSend)
 
@@ -495,7 +494,7 @@ func (d *Datapath) processNetworkSynPacket(context *PUContext, conn *TCPConnecti
 	}
 
 	tcpDataLen := uint32(tcpPacket.IPTotalLength - tcpPacket.TCPDataStartBytes())
-	tcpPacket.IncreaseTCPSeq((tcpDataLen) + (d.ackSize))
+	tcpPacket.IncreaseTCPSeq((tcpDataLen))
 
 	// Remove any of our data from the packet. No matter what we don't need the
 	// metadata any more.
@@ -598,8 +597,8 @@ func (d *Datapath) processNetworkSynAckPacket(context *PUContext, conn *TCPConne
 	}
 
 	tcpDataLen := uint32(tcpPacket.IPTotalLength - tcpPacket.TCPDataStartBytes())
-	tcpPacket.IncreaseTCPSeq(tcpDataLen - 1)
-	tcpPacket.IncreaseTCPAck(d.ackSize)
+	tcpPacket.IncreaseTCPSeq(tcpDataLen)
+	// tcpPacket.IncreaseTCPAck(d.ackSize)
 
 	// Remove any of our data
 	if err := tcpPacket.TCPDataDetach(TCPAuthenticationOptionBaseLen); err != nil {
@@ -650,21 +649,21 @@ func (d *Datapath) processNetworkAckPacket(context *PUContext, conn *TCPConnecti
 		// 	return nil, nil, fmt.Errorf("TCP Authentication Option not found")
 		// }
 
-		if _, err := d.parseAckToken(&conn.Auth, tcpPacket.ReadTCPData()); err != nil {
-			d.reportRejectedFlow(tcpPacket, conn, collector.DefaultEndPoint, context.ManagementID, context, collector.InvalidFormat, nil)
-			return nil, nil, fmt.Errorf("Ack packet dropped because signature validation failed %v", err)
-		}
-
-		// Remove any of our data - adjust the sequence numbers
-		tcpPacket.IncreaseTCPSeq(d.ackSize)
-
-		// Remove any of our data - adjust the sequence numbers
-		if err := tcpPacket.TCPDataDetach(0); err != nil {
-			d.reportRejectedFlow(tcpPacket, conn, collector.DefaultEndPoint, context.ManagementID, context, collector.InvalidFormat, nil)
-			return nil, nil, fmt.Errorf("Ack packet dropped because of invalid format %v", err)
-		}
-
-		tcpPacket.DropDetachedBytes()
+		// if _, err := d.parseAckToken(&conn.Auth, tcpPacket.ReadTCPData()); err != nil {
+		// 	d.reportRejectedFlow(tcpPacket, conn, collector.DefaultEndPoint, context.ManagementID, context, collector.InvalidFormat, nil)
+		// 	return nil, nil, fmt.Errorf("Ack packet dropped because signature validation failed %v", err)
+		// }
+		//
+		// // Remove any of our data - adjust the sequence numbers
+		// tcpPacket.IncreaseTCPSeq(d.ackSize)
+		//
+		// // Remove any of our data - adjust the sequence numbers
+		// if err := tcpPacket.TCPDataDetach(0); err != nil {
+		// 	d.reportRejectedFlow(tcpPacket, conn, collector.DefaultEndPoint, context.ManagementID, context, collector.InvalidFormat, nil)
+		// 	return nil, nil, fmt.Errorf("Ack packet dropped because of invalid format %v", err)
+		// }
+		//
+		// tcpPacket.DropDetachedBytes()
 
 		// We accept the packet as a new flow
 		d.reportAcceptedFlow(tcpPacket, conn, conn.Auth.RemoteContextID, context.ManagementID, context, conn.FlowPolicy)
