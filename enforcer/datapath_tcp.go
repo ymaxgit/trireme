@@ -339,8 +339,8 @@ func (d *Datapath) processApplicationSynAckPacket(tcpPacket *packet.Packet, cont
 		}
 
 		// Attach the tags to the packet
-		tcpPacket.DecreaseTCPSeq(uint32(len(tcpData)))
-		tcpPacket.DecreaseTCPAck(d.ackSize + 1)
+		tcpPacket.DecreaseTCPSeq(uint32(len(tcpData)) - 1)
+		tcpPacket.DecreaseTCPAck(d.ackSize)
 
 		// Attach the tags to the packet
 		return nil, tcpPacket.TCPDataAttach(tcpOptions, tcpData)
@@ -598,8 +598,8 @@ func (d *Datapath) processNetworkSynAckPacket(context *PUContext, conn *TCPConne
 	}
 
 	tcpDataLen := uint32(tcpPacket.IPTotalLength - tcpPacket.TCPDataStartBytes())
-	tcpPacket.IncreaseTCPSeq(tcpDataLen)
-	tcpPacket.IncreaseTCPAck(d.ackSize + 1)
+	tcpPacket.IncreaseTCPSeq(tcpDataLen - 1)
+	tcpPacket.IncreaseTCPAck(d.ackSize)
 
 	// Remove any of our data
 	if err := tcpPacket.TCPDataDetach(TCPAuthenticationOptionBaseLen); err != nil {
