@@ -285,7 +285,7 @@ func (d *Datapath) processApplicationSynPacket(tcpPacket *packet.Packet, context
 
 	// We use a trick to reduce the seq number from ISN so that when our component gets out of the way, the
 	// sequence numbers between the TCP stacks automatically match
-	tcpPacket.DecreaseTCPSeq(uint32(len(tcpData) - 1))
+	// tcpPacket.DecreaseTCPSeq(uint32(len(tcpData) - 1))
 
 	// Attach the tags to the packet.
 	return nil, tcpPacket.TCPDataAttach(tcpOptions, tcpData)
@@ -339,7 +339,7 @@ func (d *Datapath) processApplicationSynAckPacket(tcpPacket *packet.Packet, cont
 		}
 
 		// Attach the tags to the packet
-		tcpPacket.DecreaseTCPSeq(uint32(len(tcpData) - 1))
+		// tcpPacket.DecreaseTCPSeq(uint32(len(tcpData) - 1))
 
 		// Attach the tags to the packet
 		return nil, tcpPacket.TCPDataAttach(tcpOptions, tcpData)
@@ -493,8 +493,8 @@ func (d *Datapath) processNetworkSynPacket(context *PUContext, conn *TCPConnecti
 		return nil, nil, fmt.Errorf("TCP Authentication Option not found %v", err)
 	}
 
-	tcpDataLen := uint32(tcpPacket.IPTotalLength - tcpPacket.TCPDataStartBytes())
-	tcpPacket.IncreaseTCPSeq((tcpDataLen) - 1)
+	// tcpDataLen := uint32(tcpPacket.IPTotalLength - tcpPacket.TCPDataStartBytes())
+	// tcpPacket.IncreaseTCPSeq((tcpDataLen) - 1)
 
 	// Remove any of our data from the packet. No matter what we don't need the
 	// metadata any more.
@@ -596,8 +596,8 @@ func (d *Datapath) processNetworkSynAckPacket(context *PUContext, conn *TCPConne
 		return nil, nil, fmt.Errorf("TCP Authentication Option not found")
 	}
 
-	tcpDataLen := uint32(tcpPacket.IPTotalLength - tcpPacket.TCPDataStartBytes())
-	tcpPacket.IncreaseTCPSeq(tcpDataLen - 1)
+	// tcpDataLen := uint32(tcpPacket.IPTotalLength - tcpPacket.TCPDataStartBytes())
+	// tcpPacket.IncreaseTCPSeq(tcpDataLen - 1)
 
 	// tcpPacket.IncreaseTCPAck(d.ackSize)
 
