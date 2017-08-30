@@ -285,7 +285,7 @@ func (d *Datapath) processApplicationSynPacket(tcpPacket *packet.Packet, context
 
 	// We use a trick to reduce the seq number from ISN so that when our component gets out of the way, the
 	// sequence numbers between the TCP stacks automatically match
-	tcpPacket.DecreaseTCPSeq(uint32(len(tcpData)))
+	tcpPacket.DecreaseTCPSeq(uint32(len(tcpData) - 1))
 
 	// Attach the tags to the packet.
 	return nil, tcpPacket.TCPDataAttach(tcpOptions, tcpData)
@@ -494,7 +494,7 @@ func (d *Datapath) processNetworkSynPacket(context *PUContext, conn *TCPConnecti
 	}
 
 	tcpDataLen := uint32(tcpPacket.IPTotalLength - tcpPacket.TCPDataStartBytes())
-	tcpPacket.IncreaseTCPSeq((tcpDataLen))
+	tcpPacket.IncreaseTCPSeq((tcpDataLen) - 1)
 
 	// Remove any of our data from the packet. No matter what we don't need the
 	// metadata any more.
